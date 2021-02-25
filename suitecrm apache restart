@@ -1,0 +1,3 @@
+sudo a2ensite suitecrm.conf
+sudo a2enmod rewrite
+sudo systemctl restart apache2.service
