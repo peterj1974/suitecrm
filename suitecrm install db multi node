@@ -1,0 +1,31 @@
+RPass="<%=cypher.read('secret/mysql_root')%>"
+SCRMDb="<%=customOptions.databaseNameSCRM%>"
+SCRMUser="<%=customOptions.databaseUserSCRM%>"
+SCRMPass="<%=customOptions.databasePassSCRM%>"
+IP="<%=server.internalIp%>"
+
+#Wait until any apt-get processes have finished
+until [ `ps -ef | grep [a]pt-get | wc -l` = 0 ]
+do
+        sleep 60
+done
+
+#Install MariaDB, start service and enable on boot
+sudo apt-get install mariadb-server mariadb-client -y
+sudo systemctl stop mariadb.service
+sudo systemctl start mariadb.service
+sudo systemctl enable mariadb.service
+
+#The following commands are from the mysql secure installation guidance
+sudo mysql -u root -e "UPDATE mysql.user SET Password=PASSWORD('$RPass') WHERE User='root';"
+sudo mysql -u root -e "flush privileges"
+sudo mysql -u root -p$RPass -e "DELETE FROM mysql.user WHERE User='';"
+sudo mysql -u root -p$RPass -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+sudo mysql -u root -p$RPass -e "DROP DATABASE IF EXISTS test;"
+sudo mysql -u root -p$RPass -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';"
+sudo mysql -u root -p$RPass -e "FLUSH PRIVILEGES;"
+
+#Set bind-address parameter in my.cnf
+echo [mysqld] >> /etc/mysql/my.cnf
+echo "bind-address = $IP" >> /etc/mysql/my.cnf
+sudo systemctl restart mariadb.service
