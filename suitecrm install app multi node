@@ -13,14 +13,14 @@ then
 fi
 
 #Install sshpass and apache, start service and enable on boot
-sudo apt-get install sshpass -y
-sudo apt-get install apache2 -y
-sudo systemctl stop apache2.service
-sudo systemctl start apache2.service
-sudo systemctl enable apache2.service
+apt-get install sshpass -y
+apt-get install apache2 -y
+systemctl stop apache2.service
+systemctl start apache2.service
+systemctl enable apache2.service
 
 #Use sshpass to remotely execute mysql commands on DB server to create database and database user
-sshpass -p $CIPass ssh -oStrictHostKeyChecking=no -t pjonesci@$MYSQL_HOST <<REMOTE
+sshpass -p $CIPass ssh -o StrictHostKeyChecking=no -t pjonesci@$MYSQL_HOST <<REMOTE
 sudo -S <<< "$CIPass" mysql -u root -p$RPass -e "CREATE USER '$SCRMUser'@'$IP' IDENTIFIED BY '$SCRMPass';"
 sudo -S <<< "$CIPass" mysql -u root -p$RPass -e "CREATE DATABASE $SCRMDb;"
 sudo -S <<< "$CIPass" mysql -u root -p$RPass -e "GRANT ALL ON $SCRMDb.* TO $SCRMUser@'$IP' IDENTIFIED BY '$SCRMPass';"
@@ -28,7 +28,9 @@ sudo -S <<< "$CIPass" mysql -u root -p$RPass -e "FLUSH PRIVILEGES;"
 REMOTE
 
 #Install required software for SuiteCRM
-sudo apt-get install php7.2 libapache2-mod-php7.2 php7.2-common php7.2-mysql php7.2-gmp php7.2-curl php7.2-intl php7.2-mbstring php7.2-xmlrpc php7.2-gd php7.2-bcmath php7.2-imap php7.2-xml php7.2-cli php7.2-zip -y
+add-apt-repository ppa:ondrej/php -y
+apt-get update
+apt-get install php7.3 libapache2-mod-php7.3 php7.3-common php7.3-mysql php7.3-gmp php7.3-curl php7.3-intl php7.3-mbstring php7.3-xmlrpc php7.3-gd php7.3-bcmath php7.3-imap php7.3-xml php7.3-cli php7.3-zip -y
 
 #Update php.ini file with required settings
 short_open_tag=On
@@ -38,20 +40,20 @@ max_execution_time=360
 
 for key in short_open_tag memory_limit upload_max_filesize max_execution_time
 do
- sed -i "s/^\($key\).*/\1 $(eval echo = \${$key})/" /etc/php/7.2/apache2/php.ini
+ sed -i "s/^\($key\).*/\1 $(eval echo = \${$key})/" /etc/php/7.3/apache2/php.ini
 done
 
 #Restart apache
-sudo systemctl restart apache2.service
+systemctl restart apache2.service
 
 #Test file created for debugging
 echo "<?php phpinfo( ); ?>" | sudo tee /var/www/html/phpinfo.php
 
-#Download and install latest SuiteCRM release
+#Download and install latest SuiteCRM. Composer v2 does not work with Suitecrm.
 curl -sS https://getcomposer.org/installer | sudo php -- --version=1.10.9 --install-dir=/usr/local/bin --filename=composer
-sudo git clone https://github.com/salesagility/SuiteCRM.git /var/www/html/suitecrm
+git clone https://github.com/salesagility/SuiteCRM.git /var/www/html/suitecrm
 
 cd /var/www/html/suitecrm
-sudo composer install --no-dev
-sudo chown -R www-data:www-data /var/www/html/suitecrm/
-sudo chmod -R 755 /var/www/html/suitecrm/
+composer install --no-dev
+chown -R www-data:www-data /var/www/html/suitecrm/
+chmod -R 755 /var/www/html/suitecrm/
