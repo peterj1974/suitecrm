@@ -1,31 +1,32 @@
 RPass="<%=cypher.read('secret/mysql_root')%>"
-SCRMDb="<%=customOptions.databaseNameSCRM%>"
-SCRMUser="<%=customOptions.databaseUserSCRM%>"
-SCRMPass="<%=customOptions.databasePassSCRM%>"
 IP="<%=server.internalIp%>"
 
 #Wait until any apt-get processes have finished
-until [ `ps -ef | grep [a]pt-get | wc -l` = 0 ]
-do
-        sleep 60
-done
+if [ `ps -ef | grep [a]pt-get | wc -l` != 0 ]
+then
+        sleep 120
+fi
 
 #Install MariaDB, start service and enable on boot
-sudo apt-get install mariadb-server mariadb-client -y
-sudo systemctl stop mariadb.service
-sudo systemctl start mariadb.service
-sudo systemctl enable mariadb.service
+wget https://downloads.mariadb.com/MariaDB/mariadb_repo_setup
+echo "fd3f41eefff54ce144c932100f9e0f9b1d181e0edd86a6f6b8f2a0212100c32c mariadb_repo_setup" | sha256sum -c -
+chmod +x mariadb_repo_setup
+./mariadb_repo_setup  --mariadb-server-version="mariadb-10.6"
+apt update
+apt-get install mariadb-server mariadb-client -y
+systemctl stop mariadb.service
+systemctl start mariadb.service
+systemctl enable mariadb.service
 
 #The following commands are from the mysql secure installation guidance
-sudo mysql -u root -e "UPDATE mysql.user SET Password=PASSWORD('$RPass') WHERE User='root';"
-sudo mysql -u root -e "flush privileges"
-sudo mysql -u root -p$RPass -e "DELETE FROM mysql.user WHERE User='';"
-sudo mysql -u root -p$RPass -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
-sudo mysql -u root -p$RPass -e "DROP DATABASE IF EXISTS test;"
-sudo mysql -u root -p$RPass -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';"
-sudo mysql -u root -p$RPass -e "FLUSH PRIVILEGES;"
+mysql -u root -e "UPDATE mysql.user SET Password=PASSWORD('$RPass') WHERE User='root';"
+mysql -u root -e "flush privileges"
+mysql -u root -p$RPass -e "DELETE FROM mysql.user WHERE User='';"
+mysql -u root -p$RPass -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+mysql -u root -p$RPass -e "DROP DATABASE IF EXISTS test;"
+mysql -u root -p$RPass -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';"
+mysql -u root -p$RPass -e "FLUSH PRIVILEGES;"
 
 #Set bind-address parameter in my.cnf
-echo [mysqld] >> /etc/mysql/my.cnf
-echo "bind-address = $IP" >> /etc/mysql/my.cnf
-sudo systemctl restart mariadb.service
+sed -e '/^bind/s/^/#/g' -i /etc/mysql/mariadb.conf.d/50-server.cnf
+systemctl restart mariadb.service
